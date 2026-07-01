@@ -1,0 +1,63 @@
+name: Churn MLOps CI CD
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  test-train-build-push:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout application code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install training dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run data quality tests
+        run: |
+          pytest tests/test_data_quality.py
+
+      - name: Train churn model
+        run: |
+          python -m src.train
+
+      - name: Run model quality tests
+        run: |
+          pytest tests/test_model_quality.py
+
+      - name: Run API tests
+        run: |
+          pytest tests/test_api.py
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_TOKEN }}
+
+      - name: Build Docker image with commit tag
+        run: |
+          docker build -t ${{ secrets.DOCKER_USERNAME }}/churn-mlops-api:${{ github.sha }} .
+
+      - name: Build Docker image with latest tag
+        run: |
+          docker build -t ${{ secrets.DOCKER_USERNAME }}/churn-mlops-api:latest .
+
+      - name: Push Docker image with commit tag
+        run: |
+          docker push ${{ secrets.DOCKER_USERNAME }}/churn-mlops-api:${{ github.sha }}
+
+      - name: Push Docker image with latest tag
+        run: |
+          docker push ${{ secrets.DOCKER_USERNAME }}/churn-mlops-api:latest
