@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  test-train-build-push:
+  test-train-build-push-update-gitops:
     runs-on: ubuntu-latest
 
     steps:
@@ -46,18 +46,34 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_TOKEN }}
 
-      - name: Build Docker image with commit tag
+      - name: Build Docker image with commit and latest tags
         run: |
           docker build -t ${{ secrets.DOCKER_USERNAME }}/churn-mlops-api:${{ github.sha }} .
-
-      - name: Build Docker image with latest tag
-        run: |
           docker build -t ${{ secrets.DOCKER_USERNAME }}/churn-mlops-api:latest .
 
-      - name: Push Docker image with commit tag
+      - name: Push Docker images
         run: |
           docker push ${{ secrets.DOCKER_USERNAME }}/churn-mlops-api:${{ github.sha }}
-
-      - name: Push Docker image with latest tag
-        run: |
           docker push ${{ secrets.DOCKER_USERNAME }}/churn-mlops-api:latest
+
+      - name: Checkout GitOps repository
+        uses: actions/checkout@v4
+        with:
+          repository: Rafi1945/churn-mlops-gitops
+          token: ${{ secrets.GITOPS_TOKEN }}
+          path: churn-mlops-gitops
+          persist-credentials: true
+
+      - name: Update Kubernetes deployment image tag
+        run: |
+          cd churn-mlops-gitops
+          sed -i "s|image: .*churn-mlops-api:.*|image: ${{ secrets.DOCKER_USERNAME }}/churn-mlops-api:${{ github.sha }}|" apps/churn-api/deployment.yaml
+
+      - name: Commit and push GitOps change
+        run: |
+          cd churn-mlops-gitops
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git add apps/churn-api/deployment.yaml
+          git commit -m "Update churn API image to ${{ github.sha }}" || echo "No changes to commit"
+          git push origin main
