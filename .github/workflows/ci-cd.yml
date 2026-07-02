@@ -51,7 +51,7 @@ jobs:
           docker build -t ${{ secrets.DOCKER_USERNAME }}/churn-mlops-api:${{ github.sha }} .
           docker build -t ${{ secrets.DOCKER_USERNAME }}/churn-mlops-api:latest .
 
-      - name: Push Docker images
+      - name: Push Docker images 
         run: |
           docker push ${{ secrets.DOCKER_USERNAME }}/churn-mlops-api:${{ github.sha }}
           docker push ${{ secrets.DOCKER_USERNAME }}/churn-mlops-api:latest
